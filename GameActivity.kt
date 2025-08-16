@@ -1,152 +1,176 @@
-package com.example.rockpaperscissors
+package com.example.rpsgame
 
+import android.content.Context
 import android.os.Bundle
-import android.os.CountDownTimer
+import android.os.Handler
+import android.os.Looper
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
+import kotlin.random.Random
 
 class GameActivity : AppCompatActivity() {
 
-    // UI
-    private lateinit var topImage: ImageView
-    private lateinit var bottomImage: ImageView
     private lateinit var tvTotal: TextView
     private lateinit var tvStreak: TextView
+    private lateinit var topImage: ImageView
+    private lateinit var bottomImage: ImageView
     private lateinit var itemSelectionLayout: LinearLayout
+    private lateinit var btnStartRound: Button
 
-    // Game
-    private var running = false
-    private var currentStreak = 0
+    private val handler = Handler(Looper.getMainLooper())
+    private var topAnimationRunning = false
+    private var bottomAnimationRunning = false
+
+    private var streak = 0
     private var totalScore = 0
-    private var activeItems = mutableListOf("rock", "paper", "scissors")
-    private var beatsMap = mutableMapOf<String, List<String>>()
-    private var selectedItem = "rock"
+    private var selectedItem: String? = null
 
-    // Storage
-    private val prefs by lazy { getSharedPreferences("rps_prefs", MODE_PRIVATE) }
+    private val itemAnimations = listOf("rock", "paper", "scissors")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_game)
 
-        // Link views
-        topImage = findViewById(R.id.topImage)
-        bottomImage = findViewById(R.id.bottomImage)
         tvTotal = findViewById(R.id.tvTotal)
         tvStreak = findViewById(R.id.tvStreak)
+        topImage = findViewById(R.id.topImage)
+        bottomImage = findViewById(R.id.bottomImage)
         itemSelectionLayout = findViewById(R.id.itemSelectionLayout)
+        btnStartRound = findViewById(R.id.btnStartRound)
 
-        // Load persistent data
-        totalScore = prefs.getInt("totalScore", 0)
-        currentStreak = 0
-        activeItems = prefs.getStringSet("activeItems", setOf("rock","paper","scissors"))?.toMutableList()
-            ?: mutableListOf("rock", "paper", "scissors")
+        // Load saved total score
+        val prefs = getSharedPreferences("game_prefs", Context.MODE_PRIVATE)
+        totalScore = prefs.getInt("total_score", 0)
+        streak = 0
+        updateScoreUI()
 
-        val beatsJson = prefs.getString("beatsMap", null)
-        beatsMap = if (beatsJson != null) {
-            Utils.jsonToMap(beatsJson)
-        } else {
-            mutableMapOf(
-                "rock" to listOf("scissors"),
-                "paper" to listOf("rock"),
-                "scissors" to listOf("paper")
-            )
-        }
+        // Load owned items from prefs
+        val ownedItems = loadOwnedItems()
+        setupItemSelection(ownedItems)
 
-        updateScoreUi()
-        populateItemSelection()
-
-    }
-
-    /** Create scrollable buttons for each active item **/
-    /** Create scrollable images for each active item **/
-private fun populateItemSelection() {
-    itemSelectionLayout.removeAllViews()
-
-    for (item in activeItems) {
-        val imageView = ImageView(this)
-        imageView.setImageResource(getDrawableForChoice(item))
-        imageView.adjustViewBounds = true
-        imageView.scaleType = ImageView.ScaleType.FIT_CENTER
-
-        // Set width/height for the image
-        val sizeInDp = 80
-        val scale = resources.displayMetrics.density
-        val sizeInPx = (sizeInDp * scale + 0.5f).toInt()
-
-        val params = LinearLayout.LayoutParams(sizeInPx, sizeInPx)
-        params.setMargins(12, 0, 12, 0)
-        imageView.layoutParams = params
-
-        // Click listener to select this item
-        imageView.setOnClickListener { selectedItem = item }
-
-        itemSelectionLayout.addView(imageView)
-    }
-
-    selectedItem = activeItems.first() // default selection
-}
-
-
-    /** Start a round using the chosen item **/
-    fun startRound(view: android.view.View) {
-        if (running) return
-        running = true
-
-        var topResult = ""
-
-        val timer = object : CountDownTimer(3000, 300) {
-            override fun onTick(millisUntilFinished: Long) {
-                val randomChoice = activeItems.random()
-                topResult = randomChoice
-                topImage.setImageResource(getDrawableForChoice(randomChoice))
-                bottomImage.setImageResource(getDrawableForChoice(selectedItem))
+        btnStartRound.setOnClickListener {
+            if (selectedItem == null) {
+                Toast.makeText(this, "Please select an item!", Toast.LENGTH_SHORT).show()
+            } else {
+                startRound()
             }
+        }
+    }
 
-            override fun onFinish() {
-                running = false
-                val outcomeMessage: String
-                when {
-                    selectedItem == topResult -> {
-                        currentStreak = 0
-                        outcomeMessage = "DRAW! No points."
-                    }
-                    didPlayerWin(selectedItem, topResult) -> {
-                        currentStreak++
-                        val pointsGained = 1 shl (currentStreak - 1)
-                        totalScore += pointsGained
-                        prefs.edit().putInt("totalScore", totalScore).apply()
-                        outcomeMessage = "You WIN! +$pointsGained points"
-                    }
-                    else -> {
-                        currentStreak = 0
-                        outcomeMessage = "You LOSE! Streak reset."
-                    }
+    private fun loadOwnedItems(): List<String> {
+        val prefs = getSharedPreferences("game_prefs", Context.MODE_PRIVATE)
+        val defaultItems = setOf("rock", "paper", "scissors")
+        val ownedSet = prefs.getStringSet("owned_items", defaultItems) ?: defaultItems
+        return ownedSet.toList()
+    }
+
+    private fun setupItemSelection(items: List<String>) {
+        itemSelectionLayout.removeAllViews()
+        var lastClicked: ImageView? = null
+
+        for (item in items) {
+            val imageView = ImageView(this).apply {
+                val resId = resources.getIdentifier(item, "drawable", packageName)
+                setImageResource(resId)
+                val size = resources.getDimensionPixelSize(R.dimen.item_icon_size)
+                layoutParams = LinearLayout.LayoutParams(size, size).apply {
+                    setMargins(16, 0, 16, 0)
                 }
-                updateScoreUi()
-                Toast.makeText(this@GameActivity, "$outcomeMessage\nTotal: $totalScore", Toast.LENGTH_LONG).show()
+                setOnClickListener {
+                    selectedItem = item
+                    // Highlight selection
+                    lastClicked?.background = null
+                    background = ContextCompat.getDrawable(this@GameActivity, R.drawable.selected_border)
+                    lastClicked = this
+                }
+            }
+            itemSelectionLayout.addView(imageView)
+        }
+    }
+
+    private fun startRound() {
+        val playerChoice = selectedItem ?: return
+        animateTop()
+        animateBottom(playerChoice)
+
+        handler.postDelayed({
+            stopAnimations(playerChoice)
+        }, 3000) // 3 second countdown
+    }
+
+    private fun animateTop() {
+        topAnimationRunning = true
+        val runnable = object : Runnable {
+            override fun run() {
+                if (topAnimationRunning) {
+                    val randomItem = itemAnimations.random()
+                    val resId = resources.getIdentifier(randomItem, "drawable", packageName)
+                    topImage.setImageResource(resId)
+                    handler.postDelayed(this, 300)
+                }
             }
         }
-        timer.start()
+        handler.post(runnable)
     }
 
-    /** Dynamic win check based on beatsMap **/
-    private fun didPlayerWin(player: String, opponent: String): Boolean {
-        return beatsMap[player]?.contains(opponent) == true
-    }
-
-    /** Map item name to drawable resource **/
-    private fun getDrawableForChoice(choice: String): Int {
-        return when (choice) {
-            "rock" -> R.drawable.rock
-            "paper" -> R.drawable.paper
-            "scissors" -> R.drawable.scissors
-            else -> resources.getIdentifier(choice.lowercase(), "drawable", packageName)
+    private fun animateBottom(playerChoice: String) {
+        bottomAnimationRunning = true
+        val resId = resources.getIdentifier(playerChoice, "drawable", packageName)
+        val runnable = object : Runnable {
+            override fun run() {
+                if (bottomAnimationRunning) {
+                    bottomImage.setImageResource(resId)
+                    handler.postDelayed(this, 300)
+                }
+            }
         }
+        handler.post(runnable)
     }
 
-    private fun updateScoreUi() {
+    private fun stopAnimations(playerChoice: String) {
+        topAnimationRunning = false
+        bottomAnimationRunning = false
+
+        // Random final choice for top
+        val finalTop = itemAnimations.random()
+        val topResId = resources.getIdentifier(finalTop, "drawable", packageName)
+        topImage.setImageResource(topResId)
+
+        val bottomResId = resources.getIdentifier(playerChoice, "drawable", packageName)
+        bottomImage.setImageResource(bottomResId)
+
+        checkWinner(playerChoice, finalTop)
+    }
+
+    private fun checkWinner(player: String, cpu: String) {
+        if (player == cpu) {
+            Toast.makeText(this, "It's a draw!", Toast.LENGTH_SHORT).show()
+            streak = 0
+        } else if (
+            (player == "rock" && cpu == "scissors") ||
+            (player == "paper" && cpu == "rock") ||
+            (player == "scissors" && cpu == "paper")
+        ) {
+            streak++
+            val points = if (streak == 1) 1 else (Math.pow(2.0, (streak - 1).toDouble())).toInt()
+            totalScore += points
+            saveTotalScore()
+            Toast.makeText(this, "You win! +$points points", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(this, "You lose!", Toast.LENGTH_SHORT).show()
+            streak = 0
+        }
+        updateScoreUI()
+    }
+
+    private fun saveTotalScore() {
+        val prefs = getSharedPreferences("game_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putInt("total_score", totalScore).apply()
+    }
+
+    private fun updateScoreUI() {
         tvTotal.text = "Total: $totalScore"
-        tvStreak.text = "Streak: $currentStreak"
+        tvStreak.text = "Streak: $streak"
     }
 }
