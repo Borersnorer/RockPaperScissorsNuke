@@ -1,16 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     android:orientation="vertical"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:padding="16dp"
+    android:background="@android:color/background_light">
 
-    <!-- Score Bar -->
+    <!-- Score display -->
     <LinearLayout
+        android:orientation="horizontal"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:padding="12dp"
-        android:orientation="horizontal"
-        android:gravity="center_horizontal">
+        android:gravity="center"
+        android:layout_marginBottom="12dp">
 
         <TextView
             android:id="@+id/tvTotal"
@@ -18,71 +21,59 @@
             android:layout_height="wrap_content"
             android:text="Total: 0"
             android:textSize="18sp"
-            android:paddingEnd="24dp" />
+            android:layout_marginEnd="24dp"/>
 
         <TextView
             android:id="@+id/tvStreak"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Streak: 0"
-            android:textSize="18sp" />
+            android:textSize="18sp"/>
     </LinearLayout>
 
-    <!-- TOP HALF -->
-    <FrameLayout
+    <!-- Top animation image -->
+    <ImageView
+        android:id="@+id/topImage"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:gravity="center">
+        android:scaleType="fitCenter"
+        android:layout_marginBottom="12dp"
+        android:contentDescription="Top Item"/>
 
-        <ImageView
-            android:id="@+id/topImage"
-            android:layout_width="200dp"
-            android:layout_height="200dp"
-            android:src="@drawable/ic_launcher_foreground" />
-    </FrameLayout>
-
-    <!-- BOTTOM HALF -->
-    <LinearLayout
+    <!-- Bottom animation image -->
+    <ImageView
+        android:id="@+id/bottomImage"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:gravity="center"
-        android:orientation="vertical">
+        android:scaleType="fitCenter"
+        android:layout_marginBottom="12dp"
+        android:contentDescription="Bottom Item"/>
 
-        <ImageView
-            android:id="@+id/bottomImage"
-            android:layout_width="200dp"
-            android:layout_height="200dp"
-            android:src="@drawable/ic_launcher_foreground" />
+    <!-- Horizontal scrollable item selection -->
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:scrollbars="none"
+        android:layout_marginBottom="12dp">
 
         <LinearLayout
+            android:id="@+id/itemSelectionLayout"
             android:orientation="horizontal"
-            android:gravity="center"
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp">
-
-            <Button
-                android:id="@+id/btnRock"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Rock" />
-
-            <Button
-                android:id="@+id/btnPaper"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Paper"
-                android:layout_marginStart="16dp" />
-
-            <Button
-                android:id="@+id/btnScissors"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Scissors"
-                android:layout_marginStart="16dp" />
+            android:padding="8dp">
+            <!-- Item images will be added dynamically -->
         </LinearLayout>
-    </LinearLayout>
+    </HorizontalScrollView>
 
+    <!-- Start round button -->
+    <Button
+        android:id="@+id/btnStartRound"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Start Round"
+        android:onClick="startRound"
+        android:layout_gravity="center_horizontal"/>
 </LinearLayout>
