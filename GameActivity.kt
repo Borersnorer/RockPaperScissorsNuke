@@ -7,7 +7,7 @@ import android.os.Looper
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import kotlin.random.Random
+import org.json.JSONObject
 
 class GameActivity : AppCompatActivity() {
 
@@ -26,7 +26,8 @@ class GameActivity : AppCompatActivity() {
     private var totalScore = 0
     private var selectedItem: String? = null
 
-    private val itemAnimations = listOf("rock", "paper", "scissors")
+    private var activeItems = mutableListOf<String>()
+    private var beatsMap = mutableMapOf<String, List<String>>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -39,47 +40,53 @@ class GameActivity : AppCompatActivity() {
         itemSelectionLayout = findViewById(R.id.itemSelectionLayout)
         btnStartRound = findViewById(R.id.btnStartRound)
 
-        // Load saved total score
+        // Load persistent data
         val prefs = getSharedPreferences("game_prefs", Context.MODE_PRIVATE)
         totalScore = prefs.getInt("total_score", 0)
         streak = 0
-        updateScoreUI()
 
-        // Load owned items from prefs
-        val ownedItems = loadOwnedItems()
-        setupItemSelection(ownedItems)
+        // Load owned items
+        activeItems = prefs.getStringSet("owned_items", setOf("rock","paper","scissors"))?.toMutableList()
+            ?: mutableListOf("rock","paper","scissors")
+
+        // Load beats map
+        val beatsJson = prefs.getString("beats_map", null)
+        beatsMap = if (beatsJson != null) {
+            jsonToMap(beatsJson)
+        } else {
+            mutableMapOf(
+                "rock" to listOf("scissors"),
+                "paper" to listOf("rock"),
+                "scissors" to listOf("paper")
+            )
+        }
+
+        updateScoreUI()
+        populateItemSelection()
 
         btnStartRound.setOnClickListener {
             if (selectedItem == null) {
-                Toast.makeText(this, "Please select an item!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Select an item first!", Toast.LENGTH_SHORT).show()
             } else {
                 startRound()
             }
         }
     }
 
-    private fun loadOwnedItems(): List<String> {
-        val prefs = getSharedPreferences("game_prefs", Context.MODE_PRIVATE)
-        val defaultItems = setOf("rock", "paper", "scissors")
-        val ownedSet = prefs.getStringSet("owned_items", defaultItems) ?: defaultItems
-        return ownedSet.toList()
-    }
-
-    private fun setupItemSelection(items: List<String>) {
+    /** Create scrollable image selection **/
+    private fun populateItemSelection() {
         itemSelectionLayout.removeAllViews()
         var lastClicked: ImageView? = null
 
-        for (item in items) {
+        for (item in activeItems) {
             val imageView = ImageView(this).apply {
                 val resId = resources.getIdentifier(item, "drawable", packageName)
                 setImageResource(resId)
                 val size = resources.getDimensionPixelSize(R.dimen.item_icon_size)
-                layoutParams = LinearLayout.LayoutParams(size, size).apply {
-                    setMargins(16, 0, 16, 0)
-                }
+                layoutParams = LinearLayout.LayoutParams(size, size).apply { setMargins(16, 0, 16, 0) }
                 setOnClickListener {
                     selectedItem = item
-                    // Highlight selection
+                    // Highlight selected
                     lastClicked?.background = null
                     background = ContextCompat.getDrawable(this@GameActivity, R.drawable.selected_border)
                     lastClicked = this
@@ -87,8 +94,11 @@ class GameActivity : AppCompatActivity() {
             }
             itemSelectionLayout.addView(imageView)
         }
+
+        selectedItem = activeItems.firstOrNull()
     }
 
+    /** Start a round **/
     private fun startRound() {
         val playerChoice = selectedItem ?: return
         animateTop()
@@ -96,7 +106,7 @@ class GameActivity : AppCompatActivity() {
 
         handler.postDelayed({
             stopAnimations(playerChoice)
-        }, 3000) // 3 second countdown
+        }, 3000)
     }
 
     private fun animateTop() {
@@ -104,7 +114,7 @@ class GameActivity : AppCompatActivity() {
         val runnable = object : Runnable {
             override fun run() {
                 if (topAnimationRunning) {
-                    val randomItem = itemAnimations.random()
+                    val randomItem = activeItems.random()
                     val resId = resources.getIdentifier(randomItem, "drawable", packageName)
                     topImage.setImageResource(resId)
                     handler.postDelayed(this, 300)
@@ -132,34 +142,33 @@ class GameActivity : AppCompatActivity() {
         topAnimationRunning = false
         bottomAnimationRunning = false
 
-        // Random final choice for top
-        val finalTop = itemAnimations.random()
-        val topResId = resources.getIdentifier(finalTop, "drawable", packageName)
-        topImage.setImageResource(topResId)
-
-        val bottomResId = resources.getIdentifier(playerChoice, "drawable", packageName)
-        bottomImage.setImageResource(bottomResId)
+        // Random final top item
+        val finalTop = activeItems.random()
+        topImage.setImageResource(resources.getIdentifier(finalTop, "drawable", packageName))
+        bottomImage.setImageResource(resources.getIdentifier(playerChoice, "drawable", packageName))
 
         checkWinner(playerChoice, finalTop)
     }
 
-    private fun checkWinner(player: String, cpu: String) {
-        if (player == cpu) {
-            Toast.makeText(this, "It's a draw!", Toast.LENGTH_SHORT).show()
-            streak = 0
-        } else if (
-            (player == "rock" && cpu == "scissors") ||
-            (player == "paper" && cpu == "rock") ||
-            (player == "scissors" && cpu == "paper")
-        ) {
-            streak++
-            val points = if (streak == 1) 1 else (Math.pow(2.0, (streak - 1).toDouble())).toInt()
-            totalScore += points
-            saveTotalScore()
-            Toast.makeText(this, "You win! +$points points", Toast.LENGTH_SHORT).show()
-        } else {
-            Toast.makeText(this, "You lose!", Toast.LENGTH_SHORT).show()
-            streak = 0
+    /** Dynamic win check based on beatsMap **/
+    private fun checkWinner(player: String, opponent: String) {
+        val playerWins = beatsMap[player]?.contains(opponent) == true
+        when {
+            player == opponent -> {
+                Toast.makeText(this, "It's a draw!", Toast.LENGTH_SHORT).show()
+                streak = 0
+            }
+            playerWins -> {
+                streak++
+                val pointsGained = 1 shl (streak - 1)
+                totalScore += pointsGained
+                saveTotalScore()
+                Toast.makeText(this, "You win! +$pointsGained points", Toast.LENGTH_SHORT).show()
+            }
+            else -> {
+                Toast.makeText(this, "You lose!", Toast.LENGTH_SHORT).show()
+                streak = 0
+            }
         }
         updateScoreUI()
     }
@@ -172,5 +181,20 @@ class GameActivity : AppCompatActivity() {
     private fun updateScoreUI() {
         tvTotal.text = "Total: $totalScore"
         tvStreak.text = "Streak: $streak"
+    }
+
+    /** Utility: Convert JSON string to Map<String, List<String>> **/
+    private fun jsonToMap(json: String): MutableMap<String, List<String>> {
+        val map = mutableMapOf<String, List<String>>()
+        val obj = JSONObject(json)
+        for (key in obj.keys()) {
+            val list = mutableListOf<String>()
+            val jsonArray = obj.getJSONArray(key)
+            for (i in 0 until jsonArray.length()) {
+                list.add(jsonArray.getString(i))
+            }
+            map[key] = list
+        }
+        return map
     }
 }
