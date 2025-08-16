@@ -59,22 +59,34 @@ class GameActivity : AppCompatActivity() {
     }
 
     /** Create scrollable buttons for each active item **/
-    private fun populateItemSelection() {
-        itemSelectionLayout.removeAllViews()
-        for (item in activeItems) {
-            val button = Button(this)
-            button.text = item.capitalize()
-            button.setOnClickListener { selectedItem = item }
-            val params = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-            params.setMargins(0, 6, 0, 6)
-            button.layoutParams = params
-            itemSelectionLayout.addView(button)
-        }
-        selectedItem = activeItems.first() // default selection
+    /** Create scrollable images for each active item **/
+private fun populateItemSelection() {
+    itemSelectionLayout.removeAllViews()
+
+    for (item in activeItems) {
+        val imageView = ImageView(this)
+        imageView.setImageResource(getDrawableForChoice(item))
+        imageView.adjustViewBounds = true
+        imageView.scaleType = ImageView.ScaleType.FIT_CENTER
+
+        // Set width/height for the image
+        val sizeInDp = 80
+        val scale = resources.displayMetrics.density
+        val sizeInPx = (sizeInDp * scale + 0.5f).toInt()
+
+        val params = LinearLayout.LayoutParams(sizeInPx, sizeInPx)
+        params.setMargins(12, 0, 12, 0)
+        imageView.layoutParams = params
+
+        // Click listener to select this item
+        imageView.setOnClickListener { selectedItem = item }
+
+        itemSelectionLayout.addView(imageView)
     }
+
+    selectedItem = activeItems.first() // default selection
+}
+
 
     /** Start a round using the chosen item **/
     fun startRound(view: android.view.View) {
