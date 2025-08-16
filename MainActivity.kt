@@ -8,8 +8,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         findViewById<Button>(R.id.btnLibrary).setOnClickListener {
-            // TODO: later open a library screen
-            Toast.makeText(this, "Library not ready yet", Toast.LENGTH_SHORT).show()
+            startActivity(Intent(this, LibraryActivity::class.java))
         }
     }
 }
