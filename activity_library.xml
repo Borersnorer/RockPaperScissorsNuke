@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout 
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <TextView
+        android:id="@+id/tvTotalLibrary"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Total Score: 0"
+        android:textSize="20sp"
+        android:paddingBottom="16dp"/>
+
+    <Button
+        android:id="@+id/btnUpgrade1"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Upgrade 1 - Cost: 10 points"
+        android:layout_marginBottom="12dp"/>
+
+    <Button
+        android:id="@+id/btnUpgrade2"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Upgrade 2 - Cost: 25 points"
+        android:layout_marginBottom="12dp"/>
+
+    <Button
+        android:id="@+id/btnUpgrade3"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Upgrade 3 - Cost: 50 points"/>
+</LinearLayout>
